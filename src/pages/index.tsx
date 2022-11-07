@@ -1,26 +1,33 @@
 interface HomeProps {
-  poolCount: number;
+  pollCount: number;
   guessCount: number;
   userCount: number;
 }
 
+import { GetServerSideProps } from 'next';
+import { signOut, useSession } from 'next-auth/react';
 import Image from 'next/image';
-import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/router';
+import { FormEvent, useEffect, useState } from 'react';
 import appPreviewImage from '../assets/app-nlw-copa-preview.png';
 import iconCheckImg from '../assets/iconCheck.svg';
 import logoImg from '../assets/logo.svg';
 import usersAvatarExampleImg from '../assets/users-avatars-example.png';
+import { Loading } from '../components/Loading';
 import { api } from '../lib/axios';
 
-export default function Home({ poolCount, guessCount, userCount }: HomeProps) {
-  const [poolTitle, setPoolTitle] = useState('');
+export default function Home({ pollCount, guessCount, userCount }: HomeProps) {
+  const { data: session } = useSession();
+  const router = useRouter();
 
-  const createPool = async (event: FormEvent) => {
+  const [pollTitle, setPollTitle] = useState('');
+
+  const createPoll = async (event: FormEvent) => {
     event.preventDefault();
 
     try {
-      const response = await api.post('/pools', {
-        title: poolTitle,
+      const response = await api.post('/polls', {
+        title: pollTitle,
       });
 
       const { code } = response.data;
@@ -35,11 +42,27 @@ export default function Home({ poolCount, guessCount, userCount }: HomeProps) {
       console.log(err);
     }
 
-    setPoolTitle('');
+    setPollTitle('');
   };
 
-  return (
+  useEffect(() => {
+    if (!session && typeof session !== 'undefined') {
+      router.push('/login');
+    }
+  }, [session, router]);
+
+  return !session ? (
+    <Loading />
+  ) : (
     <div className="max-w-6xl h-screen mx-auto grid grid-cols-2 items-center gap-28">
+      <div className="absolute top-2 right-2">
+        <button
+          className="bg-yellow-500 px-4 py-2 rounded uppercase font-bold"
+          onClick={() => signOut()}
+        >
+          Sair
+        </button>
+      </div>
       <main>
         <Image src={logoImg} alt="NLW Copa" />
 
@@ -53,12 +76,12 @@ export default function Home({ poolCount, guessCount, userCount }: HomeProps) {
             alt="Imagens de membros participantes"
           />
           <strong className="text-gray-100 text-xl">
-            <span className="text-ignite-500">+{userCount}</span> pessoas já
+            <span className="text-ignite-500">+ {userCount}</span> pessoas já
             estão usando
           </strong>
         </div>
 
-        <form onSubmit={createPool} className="mt-10 flex gap-2">
+        <form onSubmit={createPoll} className="mt-10 flex gap-2">
           <input
             className="
               flex-1 
@@ -75,8 +98,8 @@ export default function Home({ poolCount, guessCount, userCount }: HomeProps) {
             type="text"
             required
             placeholder="Qual o nome do seu bolão?"
-            value={poolTitle}
-            onChange={(e) => setPoolTitle(e.target.value)}
+            value={pollTitle}
+            onChange={(e) => setPollTitle(e.target.value)}
           />
           <button
             className="
@@ -105,7 +128,7 @@ export default function Home({ poolCount, guessCount, userCount }: HomeProps) {
           <div className="flex items-center gap-6">
             <Image src={iconCheckImg} alt="Icone de check" />
             <div className="flex flex-col">
-              <span className="font-bold text-2xl">+{poolCount}</span>
+              <span className="font-bold text-2xl">+ {pollCount}</span>
               <span>Bolões criados</span>
             </div>
           </div>
@@ -113,7 +136,7 @@ export default function Home({ poolCount, guessCount, userCount }: HomeProps) {
           <div className="flex items-center gap-6">
             <Image src={iconCheckImg} alt="Icone de check" />
             <div className="flex flex-col">
-              <span className="font-bold text-2xl">+{guessCount}</span>
+              <span className="font-bold text-2xl">+ {guessCount}</span>
               <span>Palpites enviados</span>
             </div>
           </div>
@@ -130,21 +153,30 @@ export default function Home({ poolCount, guessCount, userCount }: HomeProps) {
   );
 }
 
-export const getStaticProps = async () => {
-  const [poolCountResponse, guessCountResponse, userCountResponse] =
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  // const {  } = await getSession(context);
+
+  // if (!session) {
+  //   return {
+  //     redirect: {
+  //       destination: '/login',
+  //       permanent: false,
+  //     },
+  //   };
+  // }
+
+  const [pollCountResponse, guessCountResponse, userCountResponse] =
     await Promise.all([
-      api.get('pools/count'),
+      api.get('polls/count'),
       api.get('guesses/count'),
       api.get('users/count'),
     ]);
 
   return {
     props: {
-      poolCount: poolCountResponse.data.count,
+      pollCount: pollCountResponse.data.count,
       guessCount: guessCountResponse.data.count,
       userCount: userCountResponse.data.count,
     },
-
-    revalidate: 10 * 60, //10min
   };
 };
